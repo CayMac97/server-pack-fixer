@@ -276,9 +276,90 @@ pub fn normalize_resource_id(id: &str) -> String {
     }
 }
 
+const CRC32_TABLE: [u32; 256] = {
+    let mut table = [0u32; 256];
+    let mut i = 0usize;
+    while i < 256 {
+        let mut c = i as u32;
+        let mut k = 0usize;
+        while k < 8 {
+            if (c & 1) != 0 {
+                c = 0xEDB8_8320 ^ (c >> 1);
+            } else {
+                c >>= 1;
+            }
+            k += 1;
+        }
+        table[i] = c;
+        i += 1;
+    }
+    table
+};
+
+pub fn crc32_ieee(data: &[u8]) -> u32 {
+    let mut crc = 0xFFFF_FFFFu32;
+    for &b in data {
+        let idx = ((crc ^ (b as u32)) & 0xFF) as usize;
+        crc = CRC32_TABLE[idx] ^ (crc >> 8);
+    }
+    crc ^ 0xFFFF_FFFFu32
+}
+
+/// Checks and recalculates CRC32 checksums for every chunk in a PNG file.
+/// Server resource packs (like HugoSMP / Oraxen / ItemsAdder) frequently use custom PNG obfuscators
+/// that intentionally corrupt chunk CRCs. Vanilla Java Minecraft ignores chunk CRCs, but Rust's
+/// `png` crate strictly enforces them unless corrected or ignored.
+pub fn fix_png_chunk_crcs(bytes: &mut [u8]) -> bool {
+    const PNG_SIG: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    if bytes.len() < 8 || &bytes[0..8] != &PNG_SIG {
+        return false;
+    }
+    let mut modified = false;
+    let mut pos = 8;
+    while pos + 12 <= bytes.len() {
+        let len = u32::from_be_bytes([bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]]) as usize;
+        if pos + 12 + len > bytes.len() {
+            break;
+        }
+        let chunk_type_and_data = &bytes[pos + 4..pos + 8 + len];
+        let calculated = crc32_ieee(chunk_type_and_data);
+        let stored = u32::from_be_bytes([
+            bytes[pos + 8 + len],
+            bytes[pos + 9 + len],
+            bytes[pos + 10 + len],
+            bytes[pos + 11 + len],
+        ]);
+        if stored != calculated {
+            let be = calculated.to_be_bytes();
+            bytes[pos + 8 + len..pos + 12 + len].copy_from_slice(&be);
+            modified = true;
+        }
+        pos += 12 + len;
+    }
+    modified
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_fix_png_chunk_crcs() {
+        // Minimal valid 1x1 PNG with deliberately bad CRC
+        let mut png = vec![
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // signature
+            0x00, 0x00, 0x00, 0x0D, // IHDR len 13
+            b'I', b'H', b'D', b'R',
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, // corrupt CRC
+            0x00, 0x00, 0x00, 0x00, // IEND len 0
+            b'I', b'E', b'N', b'D',
+            0x00, 0x00, 0x00, 0x00, // corrupt CRC
+        ];
+        assert!(fix_png_chunk_crcs(&mut png));
+        // Second pass should detect nothing to change
+        assert!(!fix_png_chunk_crcs(&mut png));
+    }
 
     #[test]
     fn settings_roundtrip_and_clicks() {

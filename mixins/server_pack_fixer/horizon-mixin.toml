@@ -92,6 +92,16 @@ bindings = [
 ]
 
 [[injection]]
+id = "decode_bytes"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::hud::decode_bytes"
+helper = "decode_bytes.rs"
+bindings = [
+  { name = "data", ty = "&[u8]", value = "data" },
+]
+
+[[injection]]
 id = "nine_slice"
 kind = "HEAD"
 cancellable = true

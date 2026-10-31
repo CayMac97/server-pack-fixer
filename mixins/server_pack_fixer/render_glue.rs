@@ -205,6 +205,10 @@ pub fn on_build_overlay(
         return ret;
     }
 
+    // Repair all obfuscated PNG chunk CRCs in the generated overlay on disk,
+    // ensuring Sprites::decode and texture loading never fail on CrcMismatch.
+    sanitize_png_files_in_dir(out);
+
     let mut explicit_items: BTreeSet<String> = BTreeSet::new();
     let mut model_bytes: BTreeMap<String, Vec<u8>> = BTreeMap::new();
 
@@ -684,6 +688,86 @@ pub fn on_text_styled_world_after(batch: &mut HudBatch, start_len: usize) {
             if v.depth >= 0.0 {
                 v.depth += offset;
             }
+        }
+    }
+}
+
+/// Recursively traverses directory `dir` and recalculates CRC32 checksums for any PNG files
+/// with corrupted chunk CRCs (e.g. from obfuscated SMP resource packs like HugoSMP).
+fn sanitize_png_files_in_dir(dir: &Path) {
+    fn visit(dir: &Path) {
+        let Ok(entries) = fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                visit(&path);
+            } else if path
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("png"))
+            {
+                if let Ok(mut bytes) = fs::read(&path) {
+                    if m::fix_png_chunk_crcs(&mut bytes) {
+                        let _ = fs::remove_file(&path);
+                        let _ = fs::write(&path, &bytes);
+                    }
+                }
+            }
+        }
+    }
+    visit(dir);
+}
+
+/// Hook on `horizon_client_render::hud::decode_bytes`:
+/// Server resource packs (HugoSMP / Oraxen / ItemsAdder) often deliberately corrupt PNG chunk CRCs.
+/// Vanilla Java Minecraft ignores chunk CRCs, but Rust's `png` crate returns CrcMismatch.
+/// This causes thousands of "font sheet ... could not be read" warnings, freezing asset loading
+/// and rendering missing character boxes [].
+/// With this hook, we instruct the PNG decoder to ignore checksums (matching Java behavior)
+/// and repair any malformed chunks in-place if needed.
+pub fn on_decode_bytes(
+    data: &[u8],
+) -> ControlFlow<crate::Result<(u32, u32, Vec<u8>)>> {
+    let s = m::current_settings();
+    if !s.enabled || !s.pack_compat {
+        return ControlFlow::Continue(());
+    }
+
+    let decode_attempt = |bytes: &[u8]| -> crate::Result<(u32, u32, Vec<u8>)> {
+        let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
+        decoder.ignore_checksums(true);
+        decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+        let mut reader = decoder.read_info()?;
+        let buf_size = reader
+            .output_buffer_size()
+            .ok_or("image too large")?;
+        let mut buf = vec![0; buf_size];
+        let info = reader.next_frame(&mut buf)?;
+        let channels = info.color_type.samples();
+        let mut rgba = Vec::with_capacity((info.width * info.height * 4) as usize);
+        for p in buf[..info.buffer_size()].chunks_exact(channels) {
+            rgba.extend(match channels {
+                4 => [p[0], p[1], p[2], p[3]],
+                3 => [p[0], p[1], p[2], 255],
+                2 => [p[0], p[0], p[0], p[1]],
+                _ => [p[0], p[0], p[0], 255],
+            });
+        }
+        Ok((info.width, info.height, rgba))
+    };
+
+    match decode_attempt(data) {
+        Ok(res) => ControlFlow::Break(Ok(res)),
+        Err(_) => {
+            let mut repaired = data.to_vec();
+            if m::fix_png_chunk_crcs(&mut repaired) {
+                if let Ok(res) = decode_attempt(&repaired) {
+                    return ControlFlow::Break(Ok(res));
+                }
+            }
+            ControlFlow::Continue(())
         }
     }
 }
