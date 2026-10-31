@@ -1,0 +1,11 @@
+[package]
+name = "horizon-mod-server-pack-fixer"
+version = "1.0.0"
+edition = "2024"
+license = "MIT"
+authors = ["CayMac"]
+description = "Server Pack & SMP Fixer — fixes multi-pack server downloads, 1.21 overlays, custom GUI buttons, leaderboard holograms, legacy custom_model_data items, and multiplayer chunk holes on servers like HugoSMP."
+repository = "https://github.com/CayMac97/server-pack-fixer"
+
+[lib]
+path = "src/lib.rs"

@@ -1,0 +1,260 @@
+[mod]
+id = "server_pack_fixer"
+version = "1.0.0"
+priority = 100
+
+[compatibility]
+horizon_revision = "ba6344a59cb9e755b730dcf02285fc0d33b97d3c"
+
+[[module]]
+id = "runtime"
+file = "crates/horizon-client-render/src/lib.rs"
+name = "mod_server_pack_fixer"
+source = "runtime.rs"
+visibility = "pub"
+
+[[module]]
+id = "render_glue"
+file = "crates/horizon-client-render/src/lib.rs"
+name = "mod_server_pack_fixer_render"
+source = "render_glue.rs"
+visibility = "pub"
+
+[[module]]
+id = "download_glue"
+file = "crates/horizon-client/src/lib.rs"
+name = "mod_server_pack_fixer_download"
+source = "download_glue.rs"
+visibility = "pub"
+
+[[module]]
+id = "glue"
+file = "crates/horizon-client/src/game.rs"
+name = "mod_server_pack_fixer_glue"
+source = "glue.rs"
+
+[[injection]]
+id = "download_file"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::server_packs::download::download_file"
+helper = "download_file.rs"
+bindings = [
+  { name = "dir", ty = "&Path", value = "dir" },
+  { name = "request", ty = "&Request", value = "request" },
+  { name = "headers", ty = "&[(&'static str, String)]", value = "headers" },
+  { name = "max_size", ty = "u64", value = "max_size" },
+  { name = "progress", ty = "&Sender<Progress>", value = "progress" },
+]
+
+[[injection]]
+id = "vacuum"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::server_packs::download::vacuum"
+helper = "vacuum.rs"
+bindings = [
+  { name = "dir", ty = "&Path", value = "dir" },
+  { name = "max_files", ty = "usize", value = "max_files" },
+]
+
+[[injection]]
+id = "overlays_of"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::packs::overlays_of"
+helper = "overlays_of.rs"
+bindings = [
+  { name = "meta", ty = "&serde_json::Value", value = "meta" },
+]
+
+[[injection]]
+id = "server_pack"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::packs::server_pack"
+helper = "server_pack.rs"
+bindings = [
+  { name = "id", ty = "u128", value = "id" },
+  { name = "path", ty = "&Path", value = "path" },
+]
+
+[[injection]]
+id = "build_overlay"
+kind = "RETURN"
+target = "horizon_client_render::packs::build_overlay"
+helper = "build_overlay.rs"
+bindings = [
+  { name = "vanilla", ty = "&Path", value = "vanilla" },
+  { name = "packs", ty = "&[Pack]", value = "packs" },
+  { name = "out", ty = "&Path", value = "out" },
+  { name = "ret", ty = "io::Result<()>", value = "$value" },
+]
+
+[[injection]]
+id = "nine_slice"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::ui::nine_slice"
+helper = "nine_slice.rs"
+bindings = [
+  { name = "batch", ty = "&mut HudBatch", value = "&mut *batch" },
+  { name = "atlas", ty = "&HudAtlas", value = "atlas" },
+  { name = "sprite", ty = "&str", value = "sprite" },
+  { name = "x", ty = "f32", value = "x" },
+  { name = "y", ty = "f32", value = "y" },
+  { name = "w", ty = "f32", value = "w" },
+  { name = "h", ty = "f32", value = "h" },
+  { name = "color", ty = "u32", value = "color" },
+]
+
+[[injection]]
+id = "centered_text"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::ui::centered_text"
+helper = "centered_text.rs"
+bindings = [
+  { name = "batch", ty = "&mut HudBatch", value = "&mut *batch" },
+  { name = "atlas", ty = "&HudAtlas", value = "atlas" },
+  { name = "text", ty = "&Text", value = "text" },
+  { name = "x", ty = "f32", value = "x" },
+  { name = "y", ty = "f32", value = "y" },
+  { name = "w", ty = "f32", value = "w" },
+  { name = "color", ty = "u32", value = "color" },
+]
+
+[[injection]]
+id = "region_place"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::font::Region::place"
+helper = "region_place.rs"
+bindings = [
+  { name = "reg", ty = "&mut Region", value = "&mut *self" },
+  { name = "w", ty = "u32", value = "w" },
+  { name = "h", ty = "u32", value = "h" },
+  { name = "atlas", ty = "(u32, u32)", value = "atlas" },
+  { name = "region", ty = "(u32, u32)", value = "region" },
+]
+
+[[injection]]
+id = "split_formatted"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::font::Font::split_formatted"
+helper = "split_formatted.rs"
+bindings = [
+  { name = "font", ty = "&Font", value = "self" },
+  { name = "t", ty = "&Text", value = "t" },
+  { name = "max_width", ty = "f32", value = "max_width" },
+]
+
+[[injection]]
+id = "styled_text"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_render::hud::HudBatch::text_styled_world"
+helper = "styled_text.rs"
+bindings = [
+  { name = "batch", ty = "&mut HudBatch", value = "&mut *self" },
+  { name = "atlas", ty = "&HudAtlas", value = "atlas" },
+  { name = "text", ty = "&crate::text::Text", value = "text" },
+  { name = "x", ty = "f32", value = "x" },
+  { name = "y", ty = "f32", value = "y" },
+  { name = "color", ty = "u32", value = "color" },
+  { name = "shadow", ty = "bool", value = "shadow" },
+]
+
+[[injection]]
+id = "streaming_update"
+kind = "HEAD"
+target = "horizon_client_render::streaming::Streaming::update"
+helper = "streaming_update.rs"
+bindings = [
+  { name = "streaming", ty = "&mut Streaming", value = "&mut *self" },
+  { name = "world", ty = "&mut World", value = "&mut *world" },
+]
+
+[[injection]]
+id = "apply_staged_pack"
+kind = "HEAD"
+target = "horizon_client::game::packs::Game<'_>::apply_staged_pack"
+helper = "apply_staged_pack.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[injection]]
+id = "text_display_geometry"
+kind = "HEAD"
+target = "horizon_client::game::text_displays::Game<'_>::text_display_geometry"
+helper = "text_display_geometry.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[injection]]
+id = "remote_chunk_in_range"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client::game::remote::Game<'_>::remote_chunk_in_range"
+helper = "remote_chunk_in_range.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "x", ty = "i32", value = "x" },
+  { name = "z", ty = "i32", value = "z" },
+]
+
+[[injection]]
+id = "key"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_key"
+helper = "key.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "key", ty = "&str", value = "key" },
+  { name = "pressed", ty = "bool", value = "pressed" },
+]
+
+[[injection]]
+id = "hud"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_hud"
+helper = "hud.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+  { name = "corners", ty = "&mut horizon_client::extras_hud::Corners", value = "&mut *corners" },
+]
+
+[[injection]]
+id = "list"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+helper = "list.rs"
+bindings = [
+  { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
+]
+
+[[injection]]
+id = "settings"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_settings"
+helper = "settings.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "buttons", ty = "&mut Vec<String>", value = "&mut *buttons" },
+]
+
+[[injection]]
+id = "click"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_settings_click"
+helper = "click.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mod_id", ty = "&str", value = "mod_id" },
+  { name = "button", ty = "usize", value = "button" },
+]

@@ -1,0 +1,18 @@
+schema = 1
+id = "server_pack_fixer"
+name = "Server Pack & SMP Fixer"
+version = "1.0.0"
+description = "Fixes multi-pack server resource pack downloads, 1.21 pack overlays, custom GUI button sprites & PUA labels, leaderboard holograms, legacy custom_model_data items, and multiplayer chunk holes on servers like HugoSMP."
+authors = ["CayMac"]
+license = "MIT"
+repository = "https://github.com/CayMac97/server-pack-fixer"
+icon = ""
+
+[environment]
+client = "required"
+server = "unsupported"
+
+[compatibility]
+game = ["26.3"]
+horizon = ">=0.2.0-nightly.2026.10.28"
+api = 1
